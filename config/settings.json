@@ -77,5 +77,25 @@
     "db_path": "data/metadata.db",
     "chroma_dir": "data/chroma_db",
     "snapshot_root": "data/backups/chroma_snapshots"
+  },
+  "pipeline": {
+    "confirm_before_run": true,
+    "default_preset": "incremental",
+    "presets": {
+      "incremental": {
+        "reset_index": false,
+        "rebuild_fts": true,
+        "index_vectors": true,
+        "vector_include_large_text": true,
+        "build_version_chains": true
+      },
+      "full": {
+        "reset_index": true,
+        "rebuild_fts": true,
+        "index_vectors": true,
+        "vector_include_large_text": true,
+        "build_version_chains": true
+      }
+    }
   }
 }

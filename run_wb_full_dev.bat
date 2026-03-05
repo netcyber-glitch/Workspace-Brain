@@ -3,8 +3,7 @@ setlocal
 
 rem Workspace Brain (FULL) dev helper
 rem - External storage root: D:\WB_Data
-rem - Run: run_wb_full_dev.bat gui
-rem - Run: run_wb_full_dev.bat pipeline
+rem - Run: run_wb_full_dev.bat
 
 set "WB_ROOT=D:\WB_Data"
 set "WORKSPACE_BRAIN_ROOT=%WB_ROOT%"
@@ -32,24 +31,5 @@ if not exist "%WB_ROOT%\config\settings.json" (
   )
 )
 
-if "%~1"=="" goto :usage
-
-if /I "%~1"=="gui" (
-  "%PY%" "%SCRIPT_DIR%workspace_brain_gui.py" --root "%WB_ROOT%"
-  exit /b %ERRORLEVEL%
-)
-
-if /I "%~1"=="pipeline" (
-  "%PY%" "%SCRIPT_DIR%scan_all.py" --root "%WB_ROOT%" --reset-index --rebuild-fts --index-vectors --vector-include-large-text --build-version-chains
-  exit /b %ERRORLEVEL%
-)
-
-:usage
-echo Usage:
-echo   %~nx0 gui
-echo   %~nx0 pipeline
-echo.
-echo Notes:
-echo   - storage root: %WB_ROOT%
-echo   - Edit settings.json to add projects.
-exit /b 1
+"%PY%" "%SCRIPT_DIR%workspace_brain_gui.py" --root "%WB_ROOT%"
+exit /b %ERRORLEVEL%

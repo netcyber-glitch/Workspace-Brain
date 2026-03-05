@@ -21,8 +21,10 @@
 - 방법 B(인자): `--root D:\\WB_Data`
 
 개발/테스트용 헬퍼 배치:
-- `run_wb_full_dev.bat gui` (GUI 실행)
-- `run_wb_full_dev.bat pipeline` (리셋→스캔→FTS→벡터→체인 1회 실행)
+- `run_wb_full_dev.bat` (GUI 실행)
+
+CLI 파이프라인(설정 기반 preset + 실행 전 확인):
+- `python scan_all.py --root D:\\WB_Data --pipeline`
 
 ## 설정 파일
 - 기본: `config/settings.json` (레포 포함)

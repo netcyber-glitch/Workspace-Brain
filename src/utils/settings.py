@@ -151,6 +151,30 @@ def load_settings(settings_path: Path | None = None) -> dict[str, Any]:
             pass
     settings["storage"] = storage
 
+    # pipeline 프리셋 기본값
+    pipeline = settings.get("pipeline")
+    if not isinstance(pipeline, dict):
+        pipeline = {}
+
+    pipeline_defaults = default_pipeline_settings()
+    pipeline.setdefault("confirm_before_run", pipeline_defaults["confirm_before_run"])
+    pipeline.setdefault("default_preset", pipeline_defaults["default_preset"])
+
+    presets = pipeline.get("presets")
+    if not isinstance(presets, dict):
+        presets = {}
+
+    for preset_name, preset_defaults in pipeline_defaults["presets"].items():
+        cur = presets.get(preset_name)
+        if not isinstance(cur, dict):
+            cur = {}
+        for k, v in preset_defaults.items():
+            cur.setdefault(k, v)
+        presets[preset_name] = cur
+
+    pipeline["presets"] = presets
+    settings["pipeline"] = pipeline
+
     return settings
 
 
@@ -181,6 +205,34 @@ def default_storage_settings() -> dict[str, str]:
         "db_path": str(DEFAULT_DB_PATH.as_posix()),
         "chroma_dir": str(DEFAULT_CHROMA_DIR.as_posix()),
         "snapshot_root": str(DEFAULT_SNAPSHOT_ROOT.as_posix()),
+    }
+
+
+def default_pipeline_settings() -> dict[str, Any]:
+    """
+    scan_all.py에서 사용할 파이프라인 프리셋 기본값입니다.
+    - incremental: 리셋 없이(기존 인덱스 유지) 재인덱싱 위주
+    - full: 리셋(영구 삭제) 후 전체 재구축
+    """
+    return {
+        "confirm_before_run": True,
+        "default_preset": "incremental",
+        "presets": {
+            "incremental": {
+                "reset_index": False,
+                "rebuild_fts": True,
+                "index_vectors": True,
+                "vector_include_large_text": True,
+                "build_version_chains": True,
+            },
+            "full": {
+                "reset_index": True,
+                "rebuild_fts": True,
+                "index_vectors": True,
+                "vector_include_large_text": True,
+                "build_version_chains": True,
+            },
+        },
     }
 
 
