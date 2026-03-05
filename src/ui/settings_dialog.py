@@ -32,6 +32,8 @@ from PySide6.QtWidgets import (
 )
 
 from src.utils.settings import default_storage_settings, load_settings, save_settings
+from src.utils.runtime import runtime_root, tool_cmd
+from src.utils.optional_deps import has_content_sim_deps, has_vector_deps
 
 
 @dataclass(frozen=True)
@@ -405,6 +407,15 @@ class SettingsDialog(QDialog):
 
         self.include_large_text_chk.setEnabled(False)
         self.vector_force_chk.setEnabled(False)
+        if not has_vector_deps():
+            msg = "벡터 인덱싱은 full 버전(chromadb, sentence-transformers) 설치가 필요합니다."
+            self.index_vectors_chk.setChecked(False)
+            self.index_vectors_chk.setEnabled(False)
+            self.index_vectors_chk.setToolTip(msg)
+            self.include_large_text_chk.setToolTip(msg)
+            self.vector_force_chk.setToolTip(msg)
+        if not has_content_sim_deps():
+            self.build_chains_chk.setToolTip("sentence-transformers가 없으면 내용 유사도 계산은 자동으로 스킵됩니다.")
 
         self.index_log = QPlainTextEdit()
         self.index_log.setReadOnly(True)
@@ -479,9 +490,8 @@ class SettingsDialog(QDialog):
 
         project = str(self.index_project_combo.currentData() or "").strip()
 
-        cmd = [
-            sys.executable,
-            str((Path(__file__).resolve().parent.parent.parent / "scan_all.py").resolve()),
+        root = runtime_root()
+        cmd = tool_cmd(root=root, stem="scan_all", script_name="scan_all.py") + [
             "--settings",
             str(self.settings_path),
             "--db",

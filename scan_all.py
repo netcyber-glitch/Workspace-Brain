@@ -10,21 +10,54 @@ import shutil
 import subprocess
 import sys
 import sqlite3
-sys.path.insert(0, 'D:/Workspace_Brain')
-
-from src.scanner.scanner import FileScanner
-from src.utils.settings import load_settings, resolve_enabled_projects
-from src.db.init_db import init_db
-from src.indexer.fts_indexer import rebuild_fts
-from src.indexer.vector_indexer import DEFAULT_COLLECTION_NAME
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
-DEFAULT_CHROMA_DIR = ROOT / "data" / "chroma_db"
-DEFAULT_SNAPSHOT_ROOT = ROOT / "data" / "backups" / "chroma_snapshots"
 
-os.chdir(str(ROOT))
+def _preparse_root(argv: list[str]) -> str | None:
+    """
+    --root 값은 import 시점(모듈 상수 계산) 전에 필요할 수 있어,
+    argparse 이전에 간단 파싱으로 환경변수를 먼저 세팅합니다.
+    """
+    if not argv:
+        return None
+
+    for a in argv:
+        if isinstance(a, str) and a.startswith("--root="):
+            v = a.split("=", 1)[1].strip().strip("\"").strip("'")
+            return v or None
+
+    try:
+        i = argv.index("--root")
+    except ValueError:
+        return None
+
+    if i + 1 >= len(argv):
+        return None
+
+    v = str(argv[i + 1]).strip().strip("\"").strip("'")
+    if not v or v.startswith("--"):
+        return None
+    return v
+
+
+_maybe_root = _preparse_root(list(sys.argv[1:]))
+if _maybe_root:
+    os.environ["WORKSPACE_BRAIN_ROOT"] = _maybe_root
+
+from src.scanner.scanner import FileScanner  # noqa: E402
+from src.utils.runtime import runtime_root, storage_root  # noqa: E402
+from src.utils.settings import load_settings, resolve_enabled_projects  # noqa: E402
+from src.db.init_db import init_db  # noqa: E402
+from src.indexer.fts_indexer import rebuild_fts  # noqa: E402
+from src.indexer.vector_indexer import DEFAULT_COLLECTION_NAME  # noqa: E402
+
+CODE_ROOT = runtime_root()
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
+DEFAULT_CHROMA_DIR = STORE_ROOT / "data" / "chroma_db"
+DEFAULT_SNAPSHOT_ROOT = STORE_ROOT / "data" / "backups" / "chroma_snapshots"
+
+os.chdir(str(CODE_ROOT))
 
 
 def _reset_index(db_path: Path = DEFAULT_DB_PATH, chroma_dir: Path = DEFAULT_CHROMA_DIR) -> None:
@@ -50,6 +83,7 @@ def _reset_index(db_path: Path = DEFAULT_DB_PATH, chroma_dir: Path = DEFAULT_CHR
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Workspace Brain 전체 스캔 실행")
+    parser.add_argument("--root", type=str, default="", help="config/data 루트 오버라이드(예: D:\\WB_Data)")
     parser.add_argument("--settings", type=str, default="", help="설정 파일 경로(기본: config/settings.json)")
     parser.add_argument("--db", type=str, default=str(DEFAULT_DB_PATH), help="metadata.db 경로")
     parser.add_argument("--chroma-dir", type=str, default=str(DEFAULT_CHROMA_DIR), help="ChromaDB 영속 디렉터리")
@@ -78,6 +112,9 @@ def main() -> int:
     parser.add_argument("--version-chain-require-content-sim", action="store_true", help="내용 유사도를 계산할 수 없으면 후보 제외")
     parser.add_argument("--version-chain-max-embed-chars", type=int, default=12000, help="내용 유사도 계산용 최대 텍스트 길이(문자)")
     args = parser.parse_args()
+
+    if str(args.root or "").strip():
+        os.environ["WORKSPACE_BRAIN_ROOT"] = str(args.root).strip()
 
     settings_path = Path(args.settings) if args.settings else None
     settings = load_settings(settings_path)
@@ -120,82 +157,72 @@ def main() -> int:
         _ = rebuild_fts(db_path=db_path, verbose=True)
 
     if args.index_vectors:
+        try:
+            from src.indexer.vector_indexer import index_vectors
+        except Exception as e:
+            print(f"\n[실패] 벡터 인덱싱 모듈 로드 실패: {type(e).__name__}: {e}")
+            return 2
+
         project = str(args.vector_project or "").strip() or None
         max_file_chars = 0 if bool(args.vector_include_large_text) else int(args.vector_max_file_chars)
-        cmd = [
-            sys.executable,
-            str((ROOT / "index_vectors.py").resolve()),
-            "--db",
-            str(db_path),
-            "--chroma-dir",
-            str(chroma_dir),
-            "--collection",
-            str(DEFAULT_COLLECTION_NAME),
-            "--project",
-            str(project or ""),
-            "--limit-docs",
-            str(int(args.vector_limit_docs) if int(args.vector_limit_docs) > 0 else 0),
-            "--exts",
-            str(args.vector_exts or ""),
-            "--chunk-max-chars",
-            str(int(args.vector_chunk_max_chars)),
-            "--chunk-overlap",
-            str(int(args.vector_chunk_overlap)),
-            "--max-file-chars",
-            str(int(max_file_chars)),
-            "--batch-size",
-            str(int(args.vector_batch_size)),
-            "--snapshot-root",
-            str(snapshot_root),
-            "--verbose",
-        ]
-        if bool(args.vector_force):
-            cmd.append("--force")
+        exts: set[str] = set()
+        for part in str(args.vector_exts or "").split(","):
+            p = part.strip().lower()
+            if not p:
+                continue
+            exts.add(p if p.startswith(".") else f".{p}")
 
-        env = os.environ.copy()
-        env.setdefault("PYTHONUTF8", "1")
-        env.setdefault("PYTHONFAULTHANDLER", "1")
-
-        r = subprocess.run(cmd, env=env)
-        if int(r.returncode or 0) != 0:
-            print(f"\n[실패] 벡터 인덱싱(returncode={r.returncode})")
+        try:
+            _ = index_vectors(
+                db_path=db_path,
+                chroma_dir=chroma_dir,
+                collection_name=str(DEFAULT_COLLECTION_NAME),
+                project=project,
+                include_exts=exts or None,
+                limit_docs=int(args.vector_limit_docs) if int(args.vector_limit_docs) > 0 else None,
+                chunk_max_chars=int(args.vector_chunk_max_chars),
+                chunk_overlap=int(args.vector_chunk_overlap),
+                max_file_chars=int(max_file_chars),
+                batch_size=int(args.vector_batch_size),
+                force=bool(args.vector_force),
+                verbose=True,
+            )
+        except (ValueError, RuntimeError) as e:
+            print(f"\n[실패] 벡터 인덱싱: {e}")
+            return 2
+        except Exception as e:
+            print(f"\n[실패] 벡터 인덱싱: {type(e).__name__}: {e}")
             return 2
 
     con.close()
 
     if args.build_version_chains:
         vc_project = str(args.version_chain_project or "").strip() or None
-        vc_cmd = [
-            sys.executable,
-            str((ROOT / "build_version_chains.py").resolve()),
-            "--db",
-            str(db_path),
-            "--min-chain-size",
-            str(int(args.version_chain_min_chain_size)),
-            "--max-day-gap",
-            str(int(args.version_chain_max_day_gap)),
-            "--filename-sim-threshold",
-            str(float(args.version_chain_filename_sim_threshold)),
-            "--content-sim-threshold",
-            str(float(args.version_chain_content_sim_threshold)),
-            "--max-embed-chars",
-            str(int(args.version_chain_max_embed_chars)),
-            "--verbose",
-        ]
-        if vc_project:
-            vc_cmd.extend(["--project", str(vc_project)])
-        if bool(args.version_chain_no_content_sim):
-            vc_cmd.append("--no-content-sim")
-        if bool(args.version_chain_require_content_sim):
-            vc_cmd.append("--require-content-sim")
+        try:
+            from build_version_chains import build_version_chains
+        except Exception as e:
+            print(f"\n[실패] version_chains 모듈 로드 실패: {type(e).__name__}: {e}")
+            return 2
 
-        env = os.environ.copy()
-        env.setdefault("PYTHONUTF8", "1")
-        env.setdefault("PYTHONFAULTHANDLER", "1")
-
-        r = subprocess.run(vc_cmd, env=env)
-        if int(r.returncode or 0) != 0:
-            print(f"\n[실패] version_chains 구축(returncode={r.returncode})")
+        rc = int(
+            build_version_chains(
+                db_path=db_path,
+                project=vc_project,
+                min_chain_size=int(args.version_chain_min_chain_size),
+                dry_run=False,
+                verbose=True,
+                max_day_gap=int(args.version_chain_max_day_gap),
+                filename_sim_threshold=float(args.version_chain_filename_sim_threshold),
+                content_sim_threshold=float(args.version_chain_content_sim_threshold),
+                no_content_sim=bool(args.version_chain_no_content_sim),
+                require_content_sim=bool(args.version_chain_require_content_sim),
+                max_embed_chars=int(args.version_chain_max_embed_chars),
+                debug_edge_filter=False,
+            )
+            or 0
+        )
+        if rc != 0:
+            print(f"\n[실패] version_chains 구축(returncode={rc})")
             return 2
 
     print("\n검증 완료.")

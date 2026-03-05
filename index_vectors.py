@@ -17,12 +17,14 @@ import time
 from pathlib import Path
 
 from src.indexer.vector_indexer import index_vectors, DEFAULT_COLLECTION_NAME
+from src.utils.runtime import is_frozen, runtime_root, storage_root, tool_cmd
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
-DEFAULT_CHROMA_DIR = ROOT / "data" / "chroma_db"
-DEFAULT_SNAPSHOT_ROOT = ROOT / "data" / "backups" / "chroma_snapshots"
+CODE_ROOT = runtime_root()
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
+DEFAULT_CHROMA_DIR = STORE_ROOT / "data" / "chroma_db"
+DEFAULT_SNAPSHOT_ROOT = STORE_ROOT / "data" / "backups" / "chroma_snapshots"
 
 
 def _parse_exts(s: str) -> set[str]:
@@ -40,18 +42,16 @@ def _health_check(*, chroma_dir: Path, collection: str, verbose: bool) -> tuple[
     Chroma health-check는 access violation 가능성이 있어 별도 프로세스로 실행합니다.
     반환: (ok, count)
     """
-    script = ROOT / "chroma_health_check.py"
-    if not script.exists():
+    target = CODE_ROOT / ("chroma_health_check.exe" if is_frozen() else "chroma_health_check.py")
+    if not target.exists():
         if verbose:
-            print(f"[health-check] 스크립트 없음(스킵): {script}")
+            print(f"[health-check] 실행 파일 없음(스킵): {target}")
         return (False, None)
 
     env = os.environ.copy()
     env.setdefault("PYTHONUTF8", "1")
 
-    cmd = [
-        sys.executable,
-        str(script),
+    cmd = tool_cmd(root=CODE_ROOT, stem="chroma_health_check", script_name="chroma_health_check.py") + [
         "--chroma-dir",
         str(chroma_dir),
         "--collection",

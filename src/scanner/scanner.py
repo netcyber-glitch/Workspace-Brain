@@ -19,8 +19,18 @@ import logging
 from pathlib import Path
 from typing import Iterator
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(ROOT))
+def _runtime_root() -> Path:
+    if bool(getattr(sys, "frozen", False)):
+        try:
+            return Path(sys.executable).resolve().parent
+        except Exception:
+            return Path(sys.executable).parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+ROOT = _runtime_root()
+if not bool(getattr(sys, "frozen", False)):
+    sys.path.insert(0, str(ROOT))
 
 from src.db.schema import (
     INDEXER_VERSION,
@@ -31,6 +41,7 @@ from src.db.schema import (
 )
 from src.utils.settings import load_settings
 from src.indexer.fts_indexer import upsert_fts, delete_fts
+from src.utils.runtime import storage_root
 
 # ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +89,8 @@ DEFAULT_MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024
 # 날짜 접두어 정규식
 DATE_PREFIX_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_?")
 
-DB_PATH = ROOT / "data" / "metadata.db"
+STORE_ROOT = storage_root()
+DB_PATH = STORE_ROOT / "data" / "metadata.db"
 
 logger = logging.getLogger("workspace_brain.scanner")
 

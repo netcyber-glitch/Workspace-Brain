@@ -20,10 +20,11 @@ from pathlib import Path
 from src.archive.chatgpt_export import parse_conversations, to_iso
 from src.scanner.scanner import FileScanner
 from src.utils.settings import load_settings
+from src.utils.runtime import storage_root
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_OUT_DIR = ROOT / "data" / "archive" / "chatgpt"
+STORE_ROOT = storage_root()
+DEFAULT_OUT_DIR = STORE_ROOT / "data" / "archive" / "chatgpt"
 
 
 def _safe_filename(name: str, *, max_len: int = 80) -> str:
@@ -110,7 +111,7 @@ def main() -> int:
     out_root = Path(args.out).expanduser().resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
-    work_dir = ROOT / "data" / "imports" / "_tmp_chatgpt_export"
+    work_dir = STORE_ROOT / "data" / "imports" / "_tmp_chatgpt_export"
     conversations_json = _resolve_conversations_json(input_path, work_dir)
 
     conversations = parse_conversations(conversations_json)
@@ -179,4 +180,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

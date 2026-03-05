@@ -9,9 +9,20 @@
 1) 가상환경 생성
    - `python -m venv .venv`
 2) 의존성 설치
-   - `.venv\\Scripts\\pip install -r requirements.txt`
+   - lite: `.venv\\Scripts\\pip install -r requirements-lite.txt`
+   - full: `.venv\\Scripts\\pip install -r requirements-full.txt`
 3) 실행
    - `.venv\\Scripts\\python workspace_brain_gui.py`
+
+## 레포 밖에 data/config 저장(권장)
+인덱스(`data/`)와 설정(`config/`)이 레포를 “더럽히지” 않게 하려면, 저장소 루트를 외부 폴더로 분리할 수 있습니다.
+
+- 방법 A(환경변수): `WORKSPACE_BRAIN_ROOT=D:\\WB_Data` 또는 `WB_ROOT=D:\\WB_Data`
+- 방법 B(인자): `--root D:\\WB_Data`
+
+개발/테스트용 헬퍼 배치:
+- `run_wb_full_dev.bat gui` (GUI 실행)
+- `run_wb_full_dev.bat pipeline` (리셋→스캔→FTS→벡터→체인 1회 실행)
 
 ## 설정 파일
 - 기본: `config/settings.json` (레포 포함)
@@ -21,6 +32,12 @@
 ## 인덱스/아티팩트
 - SQLite/Chroma 인덱스는 기본적으로 `data/` 아래에 생성됩니다.
 - `data/`, `tmp/`, `logs/`, `.venv/`는 커밋 대상이 아니며 `.gitignore`로 제외되어 있습니다.
+
+## 최근 작업 요약(2026-03-05)
+- `--root`/환경변수로 저장소 루트 분리(`D:\\WB_Data` 같은 외부 폴더 사용)
+- `scan_all.py`에 “대형 텍스트도 벡터 인덱싱” 옵션 추가(`--vector-include-large-text`)
+- lite/full 의존성 분리(`requirements-lite.txt`, `requirements-full.txt`)
+- PyInstaller 빌드 스크립트/스펙 정리(`scripts/`, `docs/PACKAGING.md` 참고)
 
 ## 라이선스
 - GPL-3.0 (`LICENSE`)

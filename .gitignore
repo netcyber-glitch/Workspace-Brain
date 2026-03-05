@@ -10,6 +10,7 @@ __pycache__/
 # Virtualenv
 .venv/
 venv/
+.venv-build-*/
 
 # OS / Editor
 .DS_Store
@@ -30,6 +31,7 @@ snapshots/
 dist/
 build/
 *.spec
+!scripts/*.spec
 
 # Local settings (do not commit personal paths / storage locations)
 config/settings.local.json

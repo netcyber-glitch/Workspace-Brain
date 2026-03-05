@@ -14,11 +14,51 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
+def _preparse_root(argv: list[str]) -> str | None:
+    """
+    --root는 import 시점(settings/runtime 상수 계산) 전에 필요할 수 있어,
+    argparse 이전에 간단 파싱으로 환경변수를 먼저 세팅합니다.
+    """
+    if not argv:
+        return None
+
+    for a in argv:
+        if isinstance(a, str) and a.startswith("--root="):
+            v = a.split("=", 1)[1].strip().strip("\"").strip("'")
+            return v or None
+
+    try:
+        i = argv.index("--root")
+    except ValueError:
+        return None
+
+    if i + 1 >= len(argv):
+        return None
+
+    v = str(argv[i + 1]).strip().strip("\"").strip("'")
+    if not v or v.startswith("--"):
+        return None
+    return v
+
+def _runtime_root() -> Path:
+    if bool(getattr(sys, "frozen", False)):
+        try:
+            return Path(sys.executable).resolve().parent
+        except Exception:
+            return Path(sys.executable).parent
+    return Path(__file__).resolve().parent
+
+
+_maybe_root = _preparse_root(list(sys.argv[1:]))
+if _maybe_root:
+    os.environ["WORKSPACE_BRAIN_ROOT"] = _maybe_root
+
+ROOT = _runtime_root()
+if not bool(getattr(sys, "frozen", False)):
+    sys.path.insert(0, str(ROOT))
 
 from src.ui.main_window import run_gui  # noqa: E402
-from src.utils.settings import default_storage_settings, load_settings  # noqa: E402
+from src.utils.settings import default_settings_path, default_storage_settings, load_settings  # noqa: E402
 
 
 def main() -> int:
@@ -28,17 +68,20 @@ def main() -> int:
     os.chdir(str(ROOT))
 
     p = argparse.ArgumentParser(description="Workspace Brain 데스크톱 UI(PySide6)")
+    p.add_argument("--root", type=str, default="", help="config/data 루트 오버라이드(예: D:\\WB_Data)")
     p.add_argument("--settings", type=str, default="", help="설정 파일 경로(비우면 config/settings.local.json 우선)")
     p.add_argument("--db", type=str, default="", help="metadata.db 경로(비우면 settings.json의 storage.db_path)")
     p.add_argument("--chroma-dir", type=str, default="", help="ChromaDB 영속 디렉터리(비우면 settings.json의 storage.chroma_dir)")
     args = p.parse_args()
 
+    if str(args.root or "").strip():
+        os.environ["WORKSPACE_BRAIN_ROOT"] = str(args.root).strip()
+
     settings_arg = str(args.settings or "").strip()
     if settings_arg:
         settings_path = Path(settings_arg)
     else:
-        local = ROOT / "config" / "settings.local.json"
-        settings_path = local if local.exists() else (ROOT / "config" / "settings.json")
+        settings_path = default_settings_path()
     settings = load_settings(settings_path) if settings_path.exists() else {}
 
     defaults = default_storage_settings()

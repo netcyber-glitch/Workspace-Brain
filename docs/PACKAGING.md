@@ -23,6 +23,10 @@
 
 요청 방향은 (A)입니다.
 
+추가로, 디버깅/운영 편의를 위해 “데이터 루트 오버라이드”도 지원합니다.
+- 환경변수: `WORKSPACE_BRAIN_ROOT=D:\WB_Data` 또는 `WB_ROOT=D:\WB_Data`
+- (지원되는 CLI의 경우) `--root D:\WB_Data`
+
 ### 2) lite/full의 기능 차이(권장)
 - lite
   - 스캔/FTS/미리보기/태그/연관문서(링크/작업흐름/버전 체인)까지는 동작
@@ -40,10 +44,14 @@
 Windows에서 보통 PyInstaller로 “one-folder” 빌드를 추천합니다.
 - onefile은 실행 시 임시 폴더 압축 해제가 들어가서, 데이터 경로/속도/안정성 관리가 더 까다로울 수 있습니다.
 
-예시(방향만, 확정 후 스크립트화 권장):
-- `pyinstaller --noconfirm --clean --name Workspace-Brain --noconsole workspace_brain_gui.py`
+빌드 스크립트(권장):
+- lite: `powershell -ExecutionPolicy Bypass -File scripts/build_lite.ps1 -Clean`
+- full: `powershell -ExecutionPolicy Bypass -File scripts/build_full.ps1 -Clean`
+
+출력:
+- lite: `dist/lite/Workspace-Brain/Workspace-Brain.exe`
+- full: `dist/full/Workspace-Brain/Workspace-Brain.exe`
 
 ## GPL-3.0 배포 메모(핵심만)
 - EXE로 지인에게 전달하는 것도 “배포”에 해당합니다.
 - GPL-3.0은 배포 시 소스(수정 포함) 제공 의무가 생기는데, GitHub에 소스가 공개되어 있고 해당 버전을 가리키면 충족하기 쉬운 편입니다.
-

@@ -11,13 +11,25 @@ import sys
 import time
 from pathlib import Path
 
+def _runtime_root() -> Path:
+    if bool(getattr(sys, "frozen", False)):
+        try:
+            return Path(sys.executable).resolve().parent
+        except Exception:
+            return Path(sys.executable).parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
 # 프로젝트 루트를 sys.path에 추가
-ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = _runtime_root()
+if not bool(getattr(sys, "frozen", False)):
+    sys.path.insert(0, str(ROOT))
 
 from src.db.schema import ALL_DDL, SCHEMA_VERSION, INDEXER_VERSION, EMBED_MODEL_ID
+from src.utils.runtime import storage_root
 
-DB_PATH = ROOT / "data" / "metadata.db"
+STORE_ROOT = storage_root()
+DB_PATH = STORE_ROOT / "data" / "metadata.db"
 
 
 def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:

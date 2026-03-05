@@ -13,8 +13,10 @@ import time
 from pathlib import Path
 from typing import Any
 
+from src.utils.runtime import storage_root
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+
+ROOT = storage_root()
 DEFAULT_SETTINGS_PATH = ROOT / "config" / "settings.json"
 DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
 DEFAULT_CHROMA_DIR = ROOT / "data" / "chroma_db"
@@ -124,6 +126,30 @@ def load_settings(settings_path: Path | None = None) -> dict[str, Any]:
 
         cfg["include_rel_path_prefixes"] = include
         cfg["skip_rel_path_prefixes"] = skip
+
+    # storage 경로 정규화:
+    # - settings.json에 상대 경로("data/metadata.db")가 들어있는 경우가 많아,
+    #   storage_root()를 기준으로 절대 경로로 보정합니다.
+    storage = settings.get("storage")
+    if not isinstance(storage, dict):
+        storage = {}
+    for k in ("db_path", "chroma_dir", "snapshot_root"):
+        v = storage.get(k)
+        if not isinstance(v, str):
+            continue
+        vv = v.strip().replace("\\", "/")
+        if not vv:
+            continue
+        try:
+            p = Path(vv)
+            if not p.is_absolute():
+                storage[k] = str((ROOT / p).resolve())
+            else:
+                storage[k] = str(p)
+        except Exception:
+            # 파싱 실패는 원본 유지
+            pass
+    settings["storage"] = storage
 
     return settings
 

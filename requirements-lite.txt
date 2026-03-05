@@ -1,0 +1,7 @@
+# Workspace Brain (lite)
+#
+# - FTS(키워드) + PySide6 UI 중심
+# - Vector/Hybrid(Chroma/임베딩) 기능은 비활성화됩니다.
+
+PySide6>=6.7.0
+

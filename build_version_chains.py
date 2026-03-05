@@ -27,10 +27,11 @@ from pathlib import Path
 
 from src.db.schema import EMBED_MODEL_ID
 from src.db.init_db import init_db
+from src.utils.runtime import storage_root
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
 
 # Hugging Face / transformers 로그/프로그레스 바 최소화(콘솔 스팸 완화)
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")

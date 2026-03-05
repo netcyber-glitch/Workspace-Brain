@@ -21,13 +21,17 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.utils.runtime import is_frozen, runtime_root, storage_root
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
-DEFAULT_TMP_DIR = ROOT / "tmp"
 
-# repo 루트 기준 import 보장
-sys.path.insert(0, str(ROOT))
+CODE_ROOT = runtime_root()
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
+DEFAULT_TMP_DIR = STORE_ROOT / "tmp"
+
+# repo 루트 기준 import 보장(소스 실행)
+if not is_frozen():
+    sys.path.insert(0, str(CODE_ROOT))
 
 from build_version_chains import build_version_chains  # noqa: E402
 from src.ui.backend import (  # noqa: E402

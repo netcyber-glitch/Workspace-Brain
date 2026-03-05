@@ -1,0 +1,8 @@
+# Workspace Brain (full)
+#
+# - lite + Vector/Hybrid(Chroma + 임베딩) 기능 포함
+
+PySide6>=6.7.0
+chromadb>=0.6.0
+sentence-transformers>=3.0.0
+

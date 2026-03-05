@@ -13,11 +13,12 @@ import sys
 from pathlib import Path
 
 from src.search.fts_search import search_fts
+from src.utils.runtime import storage_root
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
-DEFAULT_CHROMA_DIR = ROOT / "data" / "chroma_db"
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
+DEFAULT_CHROMA_DIR = STORE_ROOT / "data" / "chroma_db"
 
 if hasattr(sys.stdout, "reconfigure"):
     try:

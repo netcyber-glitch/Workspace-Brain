@@ -64,6 +64,7 @@ from src.ui.backend import (
 from src.ui.filter_proxy import SearchFilterProxyModel
 from src.ui.result_model import Roles, SearchResultsModel
 from src.ui.settings_dialog import SettingsDialog, StoragePaths
+from src.utils.optional_deps import has_vector_deps
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,13 @@ class MainWindow(QMainWindow):
         self.mode_combo.addItem("FTS", "fts")
         self.mode_combo.addItem("Vector", "vector")
         self.mode_combo.addItem("Hybrid", "hybrid")
+        if not has_vector_deps():
+            # lite 환경: 벡터 의존성이 없으면 Vector/Hybrid를 제거합니다.
+            for v in ("hybrid", "vector"):
+                idx = self.mode_combo.findData(v)
+                if idx >= 0:
+                    self.mode_combo.removeItem(idx)
+            self.mode_combo.setToolTip("Vector/Hybrid는 full 버전(chromadb, sentence-transformers) 설치가 필요합니다.")
 
         self.project_combo = QComboBox()
         self.project_combo.addItem("(전체)", "")

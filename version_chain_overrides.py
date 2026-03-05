@@ -27,10 +27,11 @@ from pathlib import Path
 
 from src.db.init_db import init_db
 from src.db.schema import normalize_path
+from src.utils.runtime import storage_root
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = ROOT / "data" / "metadata.db"
+STORE_ROOT = storage_root()
+DEFAULT_DB_PATH = STORE_ROOT / "data" / "metadata.db"
 
 
 @dataclass(frozen=True)
