@@ -26,6 +26,11 @@ tmp/
 test-results/
 snapshots/
 
+# Build artifacts (PyInstaller etc.)
+dist/
+build/
+*.spec
+
 # Local settings (do not commit personal paths / storage locations)
 config/settings.local.json
 config/settings.user.json
@@ -35,4 +40,3 @@ config/settings.*.user.json
 # Secrets / env files
 .env
 .env.*
-

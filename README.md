@@ -1,6 +1,10 @@
 # Workspace-Brain
 여러 프로젝트에 산재한 개발 문서/기획서/태스크 노트 등을 한 곳에서 수집·인덱싱하여 **자연어 검색(FTS/Vector/Hybrid)** 과 **문서 간 연관 관계(버전 체인/링크/유사도)** 를 추적하는 로컬 독립형 “개인 지식 베이스”입니다.
 
+## 문서
+- 사용자 설명서: `docs/USER_GUIDE.md`
+- EXE/포터블/배포 메모: `docs/PACKAGING.md`
+
 ## 빠른 시작(Windows 기준)
 1) 가상환경 생성
    - `python -m venv .venv`
