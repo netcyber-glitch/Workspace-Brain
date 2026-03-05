@@ -1,0 +1,81 @@
+{
+  "projects": {
+    "Workspace_Brain": {
+      "root": ".",
+      "enabled": true,
+      "include_rel_path_prefixes": [
+        "docs",
+        "src",
+        "config",
+        "workspace_brain_gui.py",
+        "scan_all.py",
+        "index_vectors.py",
+        "build_version_chains.py",
+        "version_chain_overrides.py",
+        "validate_version_chains_e2e.py",
+        "validate_index.py",
+        "search_cli.py",
+        "chroma_health_check.py",
+        "import_chatgpt_export.py",
+        "requirements.txt"
+      ],
+      "skip_rel_path_prefixes": []
+    }
+  },
+  "scanner": {
+    "supported_extensions": [
+      ".md",
+      ".txt",
+      ".json",
+      ".py",
+      ".ts",
+      ".js",
+      ".html",
+      ".css",
+      ".yaml",
+      ".yml",
+      ".toml",
+      ".ini",
+      ".cfg"
+    ],
+    "max_file_size_bytes": 10485760,
+    "skip_dir_names": [
+      ".git",
+      ".hg",
+      ".svn",
+      "node_modules",
+      "__pycache__",
+      ".venv",
+      "venv",
+      ".env",
+      "dist",
+      "build",
+      ".next",
+      ".nuxt",
+      "benchmarks",
+      "runtime",
+      "logs",
+      "snapshots",
+      "playwright-report",
+      "test-results",
+      "coverage",
+      "tmp",
+      "third_party",
+      ".agent",
+      ".history",
+      ".vscode",
+      ".github",
+      "nppBackup",
+      "_backup",
+      "_deprecated",
+      "_archives",
+      "_quarantine"
+    ],
+    "skip_dir_prefixes": ["dist", "build", ".tmp"]
+  },
+  "storage": {
+    "db_path": "data/metadata.db",
+    "chroma_dir": "data/chroma_db",
+    "snapshot_root": "data/backups/chroma_snapshots"
+  }
+}

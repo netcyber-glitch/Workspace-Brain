@@ -1,0 +1,48 @@
+# ── Core ──────────────────────────────────────────
+# Python 3.13+ compatible
+
+# Vector DB (로컬 서버리스)
+chromadb>=0.6.0
+
+# Embedding (로컬, CPU 가능)
+sentence-transformers>=3.0.0
+
+# AI 파이프라인 / 텍스트 처리
+langchain>=0.3.0
+langchain-openai>=0.3.0
+langchain-google-genai>=4.0.0
+langchain-anthropic>=0.3.0
+langchain-ollama>=0.2.0
+langchain-community>=0.3.0
+
+# ── LLM API SDKs ──────────────────────────────────
+openai>=1.60.0            # GPT-5.x Responses API 지원
+google-genai>=1.0.0       # Gemini 3.x 통합 SDK (langchain-google-genai 4.0 의존)
+anthropic>=0.45.0         # Claude Sonnet/Opus 4.6
+
+# ── UI ────────────────────────────────────────────
+streamlit>=1.42.0
+PySide6>=6.7.0
+
+# ── Graph Visualization ───────────────────────────
+pyvis>=0.3.2
+
+# ── RPA (클립보드·핫키·창 제어) ──────────────────
+pyautogui>=0.9.54
+keyboard>=0.13.5
+pyperclip>=1.9.0
+pywin32>=308               # win32gui (Windows 전용)
+pystray>=0.19.5            # 시스템 트레이 아이콘
+
+# ── File Watcher ──────────────────────────────────
+watchdog>=4.0.0
+
+# ── Security ──────────────────────────────────────
+keyring>=25.0.0            # OS 자격 증명 관리자 (API 키 보안 저장)
+
+# ── Packaging ─────────────────────────────────────
+# PyInstaller>=6.0.0       # .exe 빌드 (Phase 5)
+
+# ── Testing ───────────────────────────────────────
+pytest>=8.0.0
+pytest-benchmark>=4.0.0
