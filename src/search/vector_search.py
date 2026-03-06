@@ -8,6 +8,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 
 from src.db.schema import EMBED_MODEL_ID
 from src.indexer.vector_indexer import DEFAULT_COLLECTION_NAME
@@ -26,6 +27,16 @@ class VectorHit:
     best_chunk_index: int
 
 
+_MODEL_LOCK = Lock()
+_ENCODE_LOCK = Lock()
+_MODEL = None
+_MODEL_ID = ""
+
+_CHROMA_LOCK = Lock()
+_CHROMA_CLIENTS: dict[str, object] = {}
+_CHROMA_COLLECTIONS: dict[tuple[str, str], object] = {}
+
+
 def _require_deps():
     try:
         import chromadb  # noqa: F401
@@ -35,6 +46,61 @@ def _require_deps():
             "필수 패키지가 없습니다. `.venv`에서 실행하거나, "
             "`pip install chromadb sentence-transformers`를 먼저 실행하세요."
         ) from e
+
+
+def _get_embed_model():
+    _require_deps()
+    from sentence_transformers import SentenceTransformer
+
+    global _MODEL, _MODEL_ID
+    with _MODEL_LOCK:
+        if _MODEL is None or str(_MODEL_ID) != str(EMBED_MODEL_ID):
+            _MODEL = SentenceTransformer(EMBED_MODEL_ID)
+            _MODEL_ID = str(EMBED_MODEL_ID)
+        return _MODEL
+
+
+def shutdown_vector_search_resources() -> None:
+    """
+    Chroma 클라이언트/컬렉션 캐시를 정리합니다.
+    - 인덱싱(벡터 재구축) 같은 외부 작업 전에 호출하면 파일 잠김을 줄일 수 있습니다.
+    """
+    with _CHROMA_LOCK:
+        for client in list(_CHROMA_CLIENTS.values()):
+            try:
+                client._system.stop()
+            except Exception:
+                pass
+        _CHROMA_COLLECTIONS.clear()
+        _CHROMA_CLIENTS.clear()
+
+
+def _get_chroma_collection(*, chroma_dir: Path, collection_name: str):
+    _require_deps()
+    import chromadb
+    from chromadb.config import Settings
+
+    dkey = str(chroma_dir)
+    ckey = (dkey, str(collection_name))
+
+    with _CHROMA_LOCK:
+        client = _CHROMA_CLIENTS.get(dkey)
+        if client is None:
+            client = chromadb.PersistentClient(
+                path=dkey,
+                settings=Settings(anonymized_telemetry=False),
+            )
+            _CHROMA_CLIENTS[dkey] = client
+
+        collection = _CHROMA_COLLECTIONS.get(ckey)
+        if collection is None:
+            try:
+                collection = client.get_collection(name=str(collection_name))
+            except Exception as e:
+                raise ValueError(f"Chroma collection을 찾을 수 없습니다: {collection_name} ({e})") from e
+            _CHROMA_COLLECTIONS[ckey] = collection
+
+        return collection
 
 
 def search_vector(
@@ -50,66 +116,49 @@ def search_vector(
     if not query or not str(query).strip():
         return []
 
-    _require_deps()
-    import chromadb
-    from chromadb.config import Settings
-    from sentence_transformers import SentenceTransformer
+    collection = _get_chroma_collection(chroma_dir=chroma_dir, collection_name=str(collection_name))
 
-    client = chromadb.PersistentClient(
-        path=str(chroma_dir),
-        settings=Settings(anonymized_telemetry=False),
-    )
-    try:
-        try:
-            collection = client.get_collection(name=str(collection_name))
-        except Exception as e:
-            raise ValueError(f"Chroma collection을 찾을 수 없습니다: {collection_name} ({e})") from e
-
-        model = SentenceTransformer(EMBED_MODEL_ID)
+    model = _get_embed_model()
+    with _ENCODE_LOCK:
         q_emb = model.encode([query], normalize_embeddings=True, show_progress_bar=False).tolist()
 
-        res = collection.query(
-            query_embeddings=q_emb,
-            n_results=max(1, int(chunk_topk)),
-            include=["distances", "metadatas"],
-        )
+    res = collection.query(
+        query_embeddings=q_emb,
+        n_results=max(1, int(chunk_topk)),
+        include=["distances", "metadatas"],
+    )
 
-        ids_list = (res.get("ids") or [[]])[0]
-        dist_list = (res.get("distances") or [[]])[0]
-        meta_list = (res.get("metadatas") or [[]])[0]
+    ids_list = (res.get("ids") or [[]])[0]
+    dist_list = (res.get("distances") or [[]])[0]
+    meta_list = (res.get("metadatas") or [[]])[0]
 
-        # chunk → doc 집계 (최고 유사도 기준)
-        best_by_doc: dict[str, tuple[float, str, int]] = {}
-        for cid, dist, meta in zip(ids_list, dist_list, meta_list):
-            if not meta:
-                continue
-            doc_id = str(meta.get("doc_id") or "")
-            if not doc_id:
-                continue
-            proj = str(meta.get("project") or "")
-            if project and proj != project:
-                continue
+    # chunk → doc 집계 (최고 유사도 기준)
+    best_by_doc: dict[str, tuple[float, str, int]] = {}
+    for cid, dist, meta in zip(ids_list, dist_list, meta_list):
+        if not meta:
+            continue
+        doc_id = str(meta.get("doc_id") or "")
+        if not doc_id:
+            continue
+        proj = str(meta.get("project") or "")
+        if project and proj != project:
+            continue
 
-            try:
-                d = float(dist)
-            except Exception:
-                d = 1.0
-
-            # cosine distance로 가정: similarity = 1 - distance
-            sim = 1.0 - d
-            chunk_index = int(meta.get("chunk_index") or 0)
-
-            prev = best_by_doc.get(doc_id)
-            if prev is None or sim > prev[0]:
-                best_by_doc[doc_id] = (sim, str(cid), chunk_index)
-
-        if not best_by_doc:
-            return []
-    finally:
         try:
-            client._system.stop()
+            d = float(dist)
         except Exception:
-            pass
+            d = 1.0
+
+        # cosine distance로 가정: similarity = 1 - distance
+        sim = 1.0 - d
+        chunk_index = int(meta.get("chunk_index") or 0)
+
+        prev = best_by_doc.get(doc_id)
+        if prev is None or sim > prev[0]:
+            best_by_doc[doc_id] = (sim, str(cid), chunk_index)
+
+    if not best_by_doc:
+        return []
 
     ranked = sorted(best_by_doc.items(), key=lambda x: x[1][0], reverse=True)[: max(1, int(limit))]
     doc_ids = [doc_id for doc_id, _ in ranked]

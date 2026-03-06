@@ -483,6 +483,15 @@ class SettingsDialog(QDialog):
             QMessageBox.critical(self, "저장 실패", f"settings.json 저장에 실패했습니다.\n\n{type(e).__name__}: {e}")
             return
 
+        # 벡터 검색이 Chroma 파일을 잡고 있으면 인덱싱 프로세스와 충돌할 수 있어,
+        # 가능한 범위에서 캐시(클라이언트)를 정리하고 실행합니다.
+        try:
+            from src.search.vector_search import shutdown_vector_search_resources
+
+            shutdown_vector_search_resources()
+        except Exception:
+            pass
+
         self._append_log("=== 인덱싱 시작 ===")
         self._append_log(f"settings: {self.settings_path}")
         self._append_log(f"db: {storage_paths.db_path}")
