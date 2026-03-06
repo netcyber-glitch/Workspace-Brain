@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         self._related_gen = 0
         self._override_gen = 0
         self._threads: list[QThread] = []
+        self._workers: list[_FnWorker] = []
         self._last_preview_doc_id: str | None = None
         self._last_preview_abs_path: str | None = None
         self._last_preview_text: str = ""
@@ -931,8 +932,15 @@ class MainWindow(QMainWindow):
         thread = QThread(self)
         worker.moveToThread(thread)
 
-        worker.finished.connect(lambda g, res: self._finish_thread(thread, on_ok, g, res))
-        worker.failed.connect(lambda g, msg: self._finish_thread(thread, on_fail, g, msg))
+        # NOTE: PySide에서는 "lambda 슬롯"이 worker 스레드에서 실행될 수 있어,
+        # UI 갱신을 안전하게 하려면 QObject 슬롯(=self)에 연결해야 합니다.
+        worker._wb_thread = thread  # type: ignore[attr-defined]
+        worker._wb_on_ok = on_ok  # type: ignore[attr-defined]
+        worker._wb_on_fail = on_fail  # type: ignore[attr-defined]
+        self._workers.append(worker)
+
+        worker.finished.connect(self._on_worker_ok)
+        worker.failed.connect(self._on_worker_fail)
 
         thread.started.connect(worker.run)
         thread.finished.connect(worker.deleteLater)
@@ -940,6 +948,7 @@ class MainWindow(QMainWindow):
 
         self._threads.append(thread)
         thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
+        thread.finished.connect(lambda: self._workers.remove(worker) if worker in self._workers else None)
         thread.start()
 
     def _finish_thread(self, thread: QThread, cb, gen: int, payload) -> None:
@@ -947,6 +956,22 @@ class MainWindow(QMainWindow):
             cb(int(gen), payload)
         finally:
             thread.quit()
+
+    @Slot(int, object)
+    def _on_worker_ok(self, gen: int, res: object) -> None:
+        worker = self.sender()
+        thread = getattr(worker, "_wb_thread", None)
+        cb = getattr(worker, "_wb_on_ok", None)
+        if isinstance(thread, QThread) and callable(cb):
+            self._finish_thread(thread, cb, int(gen), res)
+
+    @Slot(int, str)
+    def _on_worker_fail(self, gen: int, msg: str) -> None:
+        worker = self.sender()
+        thread = getattr(worker, "_wb_thread", None)
+        cb = getattr(worker, "_wb_on_fail", None)
+        if isinstance(thread, QThread) and callable(cb):
+            self._finish_thread(thread, cb, int(gen), str(msg))
 
     def closeEvent(self, event) -> None:  # noqa: N802
         # 종료 시점에 백그라운드 스레드가 남아있으면 종료 코드가 불안정해질 수 있어,
